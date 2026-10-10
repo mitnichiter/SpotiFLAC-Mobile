@@ -34,12 +34,10 @@ class ExtensionRepoCard extends ConsumerWidget {
     }
     return Padding(
       padding: margin,
-      // Repo pages scroll these cards over the plain page background, where a
-      // backdrop blur is invisible but re-filters the whole card every frame.
+      // The shared artwork backdrop gives these cards a visible frosted tint.
       child: MornyeGlass.navigation(
         radius: 24,
         blurEnabled: ref.watch(mornyeBlurEnabledProvider),
-        samplesBackdrop: false,
         child: Material(color: Colors.transparent, child: child),
       ),
     );

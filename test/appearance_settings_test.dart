@@ -188,7 +188,9 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('glass clarity explains high contrast ($mode)', (tester) async {
+    testWidgets('glass clarity recovers from high contrast ($mode)', (
+      tester,
+    ) async {
       tester.platformDispatcher.accessibilityFeaturesTestValue =
           const FakeAccessibilityFeatures(highContrast: true);
       addTearDown(
@@ -210,10 +212,96 @@ void main() {
               find.byKey(const ValueKey('mornye-glass-clarity-unavailable')),
             )
             .data,
-        'Glass stays opaque while the system’s high contrast setting is on.',
+        'Your device reports increased contrast, so glass and the clarity slider '
+        'are paused. Turn on “Always use blur effects” below to enable them.',
       );
+      await tester.drag(slider, const Offset(160, 0));
+      await tester.pumpAndSettle();
+      expect(tester.widget<Slider>(slider).value, kDefaultMornyeGlassClarity);
+      expect(prefs.getDouble(kMornyeGlassClarityKey), isNull);
+
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures();
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(slider);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('mornye-glass-clarity-unavailable')),
+        findsNothing,
+      );
+      await tester.drag(slider, const Offset(160, 0));
+      await tester.pumpAndSettle();
+      expect(tester.widget<Slider>(slider).value, 1);
+      expect(prefs.getDouble(kMornyeGlassClarityKey), 1);
       expect(tester.takeException(), isNull);
     });
+
+    testWidgets(
+      'forced glass works with system contrast and persists ($mode)',
+      (tester) async {
+        tester.platformDispatcher.accessibilityFeaturesTestValue =
+            const FakeAccessibilityFeatures(highContrast: true);
+        addTearDown(
+          tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+        );
+        SharedPreferences.setMockInitialValues({
+          kThemeStyleKey: 'mornye',
+          kThemeModeKey: mode.name,
+        });
+        final prefs = await SharedPreferences.getInstance();
+        await openSettings(tester, prefs);
+        final slider = find.byKey(const ValueKey('mornye-glass-clarity'));
+        final preview = find.byKey(const ValueKey('mornye-glass-preview'));
+        final previewBlur = find.descendant(
+          of: preview,
+          matching: find.byType(BackdropFilter),
+        );
+        final forceBlur = find.text('Always use blur effects');
+        await tester.ensureVisible(slider);
+        await tester.pumpAndSettle();
+        expect(tester.widget<Slider>(slider).onChanged, isNull);
+        expect(previewBlur, findsNothing);
+
+        await tester.ensureVisible(forceBlur);
+        await tester.tap(forceBlur);
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(slider);
+        await tester.pumpAndSettle();
+        expect(MediaQuery.highContrastOf(tester.element(slider)), isTrue);
+        expect(previewBlur, findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('mornye-glass-clarity-unavailable')),
+          findsNothing,
+        );
+        await tester.drag(slider, const Offset(160, 0));
+        await tester.pumpAndSettle();
+        expect(prefs.getDouble(kMornyeGlassClarityKey), 1);
+        expect(
+          MornyeTheme.fromContext(
+            tester.element(slider),
+            chromeSurface: Colors.blue,
+          ).extension<MornyeTheme>()!.forceGlassEffects,
+          isTrue,
+        );
+
+        await tester.pumpWidget(const SizedBox());
+        await openSettings(tester, prefs);
+        await tester.ensureVisible(slider);
+        await tester.pumpAndSettle();
+        expect(tester.widget<Slider>(slider).value, 1);
+        expect(tester.widget<Slider>(slider).onChanged, isNotNull);
+        expect(previewBlur, findsOneWidget);
+        await tester.ensureVisible(forceBlur);
+        await tester.tap(forceBlur);
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(slider);
+        await tester.pumpAndSettle();
+        expect(tester.widget<Slider>(slider).onChanged, isNull);
+        expect(tester.widget<Slider>(slider).value, 1);
+        expect(previewBlur, findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
 
     testWidgets('Mornye accent updates live and survives restart ($mode)', (
       tester,

@@ -16,6 +16,7 @@ import 'package:spotiflac_android/l10n/supported_locales.dart';
 import 'package:spotiflac_android/utils/adaptive_layout.dart';
 import 'package:spotiflac_android/widgets/app_snack_bar.dart';
 import 'package:spotiflac_android/widgets/mornye_glass_preparation.dart';
+import 'package:spotiflac_android/widgets/mornye_app_background.dart';
 import 'package:spotiflac_android/widgets/playback_feedback.dart';
 
 String initialLocationForAppState({
@@ -220,9 +221,11 @@ class SpotiFLACApp extends ConsumerWidget {
               // inherited controller disables flights on the root Navigator.
               child: MornyeGlassPreparation(
                 child: AdaptiveUiScaler(
-                  child: heroAnimationsEnabled
-                      ? appContent
-                      : HeroControllerScope.none(child: appContent),
+                  child: MornyeAppBackground(
+                    child: heroAnimationsEnabled
+                        ? appContent
+                        : HeroControllerScope.none(child: appContent),
+                  ),
                 ),
               ),
             );

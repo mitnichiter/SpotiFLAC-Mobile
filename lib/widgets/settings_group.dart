@@ -196,7 +196,7 @@ class SettingsGroup extends StatelessWidget {
     super.key,
     required this.children,
     this.margin,
-    this.glass = false,
+    this.glass = true,
   });
 
   @override

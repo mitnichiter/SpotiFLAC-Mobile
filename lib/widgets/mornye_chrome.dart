@@ -70,6 +70,7 @@ class MornyeGlassPanel extends ConsumerWidget {
     this.tintColor,
     this.blurEnabled = true,
     this.highlightBorder = false,
+    this.independentBackdrop = false,
   }) : _composedBackdrop = false;
 
   const MornyeGlassPanel.overlay({
@@ -82,6 +83,7 @@ class MornyeGlassPanel extends ConsumerWidget {
     this.tintColor,
     this.blurEnabled = true,
     this.highlightBorder = false,
+    this.independentBackdrop = false,
   }) : strongTint = true,
        _composedBackdrop = true;
 
@@ -94,6 +96,10 @@ class MornyeGlassPanel extends ConsumerWidget {
   final Color? tintColor;
   final bool blurEnabled;
   final bool highlightBorder;
+
+  /// This panel has newly painted content behind it, even inside another glass
+  /// surface (for example the appearance preview). Give it a separate sample.
+  final bool independentBackdrop;
   final bool _composedBackdrop;
 
   @override
@@ -113,6 +119,11 @@ class MornyeGlassPanel extends ConsumerWidget {
     // One overlay gets its own key: the package composes blur and refraction
     // into one backdrop read, including while the route moves. Sharing that
     // key with the page or another overlapping menu would lose their glass.
+    if (independentBackdrop) {
+      return LiquidGlassBatch(
+        child: _GlassBackdropScope(hasBackdrop: false, child: glass),
+      );
+    }
     return _composedBackdrop ? LiquidGlassBatch(child: glass) : glass;
   }
 }
@@ -129,7 +140,7 @@ class MornyeGlass extends ConsumerWidget {
     this.tintOpacity,
     this.tintColor,
     this.highlightBorder = false,
-    this.refractionDepth = 0.30,
+    this.refractionDepth = 0.50,
   }) : firstInGroup = true,
        lastInGroup = true,
        samplesBackdrop = true;
@@ -146,12 +157,14 @@ class MornyeGlass extends ConsumerWidget {
     this.tintColor,
     this.samplesBackdrop = true,
     this.highlightBorder = false,
-    this.refractionDepth = 0.30,
+    this.refractionDepth = 0.50,
   });
 
   // Quantized and shared across surfaces. Avoid composed color filters and
   // rebuilding a Gaussian filter for each clarity-slider animation frame.
-  static const _blurSigmas = [2.0, 3.0, 6.0, 16.0];
+  // Clarity controls translucency; even clear glass should soften sharp page
+  // details. Keep the separate, small frosted budget for mid-range devices.
+  static const _blurSigmas = [8.0, 3.0, 12.0, 16.0];
   static final _blurs = [
     for (final sigma in _blurSigmas)
       ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
@@ -182,7 +195,7 @@ class MornyeGlass extends ConsumerWidget {
         blurEnabled &&
         level != MornyeGlassLevel.flat &&
         clarity > 0 &&
-        !MediaQuery.highContrastOf(context);
+        !MornyeTheme.glassBlockedByHighContrast(context);
     final dark = scheme.brightness == Brightness.dark;
     final shape = BorderRadius.vertical(
       top: firstInGroup ? Radius.circular(radius) : Radius.zero,
@@ -228,8 +241,10 @@ class MornyeGlass extends ConsumerWidget {
           )
         : scheme.surfaceContainerHigh;
     final insideGlass =
-        context.dependOnInheritedWidgetOfExactType<_GlassBackdropScope>() !=
-        null;
+        context
+            .dependOnInheritedWidgetOfExactType<_GlassBackdropScope>()
+            ?.hasBackdrop ??
+        false;
     // At low clarity the tint obscures almost all detail. In particular, 10%
     // must not suddenly enable backdrop sampling on a mid-range GPU.
     final blurThreshold = level == MornyeGlassLevel.frosted ? 0.5 : 0.2;
@@ -257,7 +272,9 @@ class MornyeGlass extends ConsumerWidget {
         .withValues(alpha: dark ? 0.17 : 0.46);
     final surface = DecoratedBox(
       decoration: BoxDecoration(
-        color: useLens && !strongTint
+        // Blur fallback and shader glass use the same material. A renderer
+        // without refraction must not turn the clarity slider into a gray slab.
+        color: translucent && !strongTint
             ? Color.lerp(tint, clearFill, ((clarity - 0.2) / 0.8).clamp(0, 1))
             : tint,
         borderRadius: shape,
@@ -310,10 +327,13 @@ class MornyeGlass extends ConsumerWidget {
 }
 
 class _GlassBackdropScope extends InheritedWidget {
-  const _GlassBackdropScope({required super.child});
+  const _GlassBackdropScope({required super.child, this.hasBackdrop = true});
+
+  final bool hasBackdrop;
 
   @override
-  bool updateShouldNotify(_GlassBackdropScope oldWidget) => false;
+  bool updateShouldNotify(_GlassBackdropScope oldWidget) =>
+      hasBackdrop != oldWidget.hasBackdrop;
 }
 
 /// Subtle edge definition without another offscreen layer or backdrop read.
@@ -352,7 +372,7 @@ class _MornyeGlassRim extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 0.5
         // A thin contact edge must not paint a shadow under the whole glass.
-        ..color = Colors.black.withValues(alpha: 0.5),
+        ..color = Colors.black.withValues(alpha: 0.26),
     );
     if (illuminated) {
       canvas.drawRRect(
@@ -366,13 +386,13 @@ class _MornyeGlassRim extends CustomPainter {
             stops: const [0, 0.14, 0.5, 0.86, 1],
             colors: [
               firstInGroup
-                  ? Color(emphasized ? 0x88ffffff : 0x40ffffff)
+                  ? Color(emphasized ? 0x88ffffff : 0x60ffffff)
                   : Colors.transparent,
               Color(emphasized ? 0x26ffffff : 0x0dffffff),
               const Color(0x0a000000),
               Color(emphasized ? 0x20ffffff : 0x0dffffff),
               lastInGroup
-                  ? Color(emphasized ? 0x55ffffff : 0x26ffffff)
+                  ? Color(emphasized ? 0x55ffffff : 0x36ffffff)
                   : Colors.transparent,
             ],
           ).createShader(bounds),
@@ -514,7 +534,7 @@ class MornyeTabBar extends StatelessWidget {
       liquidGlass &&
       MornyeTheme.glassClarityOf(context) > 0 &&
       !MediaQuery.disableAnimationsOf(context) &&
-      !MediaQuery.highContrastOf(context);
+      !MornyeTheme.glassBlockedByHighContrast(context);
 
   @override
   Widget build(BuildContext context) {

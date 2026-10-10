@@ -127,7 +127,7 @@
       }
     }
   },
-  "appearanceGlassClarityHighContrast": "Glass stays opaque while the system’s high contrast setting is on.",
+  "appearanceGlassClarityHighContrast": "Your device reports increased contrast, so glass and the clarity slider are paused. Turn on “Always use blur effects” below to enable them.",
   "@appearanceGlassClarityHighContrast": {
     "description": "Shown under the disabled glass clarity slider while the OS high contrast accessibility setting is on"
   },
@@ -2359,6 +2359,10 @@
   "appearanceForceBlurSubtitle": "Enable the navigation bar blur even on devices where it is off by default. May cost performance.",
   "@appearanceForceBlurSubtitle": {
     "description": "Subtitle for the force-blur toggle"
+  },
+  "appearanceForceGlassSubtitle": "Use glass and blur even when device settings disable them. Translucency may reduce text readability and use more power.",
+  "@appearanceForceGlassSubtitle": {
+    "description": "Mornye subtitle explaining that the force-blur toggle overrides device performance and contrast restrictions"
   },
   "queueClearAll": "Clear All",
   "@queueClearAll": {

@@ -803,7 +803,6 @@ extension _HomeTabSearchResultsUI on _HomeTabState {
 
     return AppSearchField(
       controller: _urlController,
-      samplesBackdrop: false,
       focusNode: _searchFocusNode,
       hintText: _getSearchHint(),
       clearTooltip: context.l10n.dialogClear,

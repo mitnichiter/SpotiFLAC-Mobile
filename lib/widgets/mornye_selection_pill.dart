@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:liquid_glass_easy/liquid_glass_easy.dart';
+import 'package:spotiflac_android/theme/mornye_theme.dart';
 import 'package:spotiflac_android/widgets/mornye_liquid_backdrop.dart';
 
 Future<ui.FragmentProgram>? _selectionMaskProgram;
@@ -146,7 +147,7 @@ class _MornyeSelectionPillState extends State<MornyeSelectionPill>
         widget.liquidInteraction &&
         ui.ImageFilter.isShaderFilterSupported &&
         !MediaQuery.disableAnimationsOf(context) &&
-        !MediaQuery.highContrastOf(context);
+        !MornyeTheme.glassBlockedByHighContrast(context);
     final pressProgress = lensEnabled ? _pressAnimation.value : 0.0;
     final content = Listener(
       // An accepted drag can end with a PointerCancelEvent. Do not navigate

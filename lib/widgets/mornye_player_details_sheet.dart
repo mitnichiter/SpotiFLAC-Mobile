@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:spotiflac_android/l10n/l10n.dart';
 import 'package:spotiflac_android/providers/runtime_profile_provider.dart';
+import 'package:spotiflac_android/theme/mornye_theme.dart';
 import 'package:spotiflac_android/widgets/app_bottom_sheet.dart';
 import 'package:spotiflac_android/widgets/mornye_chrome.dart';
 import 'package:spotiflac_android/widgets/mornye_metadata_row.dart';
@@ -28,7 +29,7 @@ class MornyePlayerDetailsSheet extends ConsumerWidget {
     final theme = Theme.of(context);
     final item = mediaItem;
     final blur =
-        !MediaQuery.highContrastOf(context) &&
+        !MornyeTheme.glassBlockedByHighContrast(context) &&
         ref.watch(mornyeBlurEnabledProvider);
     return MornyeGlass.navigation(
       blurEnabled: blur,

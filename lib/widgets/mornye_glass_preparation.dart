@@ -18,7 +18,7 @@ class MornyeGlassPreparation extends ConsumerWidget {
     if (context.isMornye &&
         ref.watch(mornyeGlassLevelProvider) == MornyeGlassLevel.liquid &&
         MornyeTheme.glassClarityOf(context) > 0.2 &&
-        !MediaQuery.highContrastOf(context)) {
+        !MornyeTheme.glassBlockedByHighContrast(context)) {
       unawaited(MornyeGlassWarmup.prepare(View.of(context)));
     }
     return child;

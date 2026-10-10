@@ -14,16 +14,24 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
     this.accent = MornyeAccent.red,
     this.useSystemFont = false,
     this.glassClarity = kDefaultMornyeGlassClarity,
+    this.forceGlassEffects = false,
   });
 
   final Color? chromeSurface;
   final MornyeAccent accent;
   final bool useSystemFont;
   final double glassClarity;
+  final bool forceGlassEffects;
 
   static double glassClarityOf(BuildContext context) =>
       Theme.of(context).extension<MornyeTheme>()?.glassClarity ??
       kDefaultMornyeGlassClarity;
+
+  /// Flutter reports even medium Android color contrast as high contrast. An explicit
+  /// blur preference overrides only glass, without changing text accessibility.
+  static bool glassBlockedByHighContrast(BuildContext context) =>
+      MediaQuery.highContrastOf(context) &&
+      !(Theme.of(context).extension<MornyeTheme>()?.forceGlassEffects ?? false);
 
   /// A single translucent fill for controls inside an existing glass surface.
   static Color controlFill(BuildContext context, {bool enabled = true}) {
@@ -121,6 +129,7 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
     MornyeAccent accent = MornyeAccent.red,
     bool useSystemFont = false,
     double glassClarity = kDefaultMornyeGlassClarity,
+    bool forceGlassEffects = false,
   }) {
     final key = (
       defaultTargetPlatform,
@@ -132,7 +141,7 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
     final cached = _themeCache.remove(key);
     if (cached != null) {
       _themeCache[key] = cached;
-      return _withGlassClarity(cached, glassClarity);
+      return _withGlassPreferences(cached, glassClarity, forceGlassEffects);
     }
     final theme = _build(
       brightness,
@@ -144,19 +153,30 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
       _themeCache.remove(_themeCache.keys.first);
     }
     _themeCache[key] = theme;
-    return _withGlassClarity(theme, glassClarity);
+    return _withGlassPreferences(theme, glassClarity, forceGlassEffects);
   }
 
   // Moving the clarity slider only changes the material, not typography or
   // seeded colors. Keep the expensive base theme cached independently.
-  static ThemeData _withGlassClarity(ThemeData theme, double value) {
+  static ThemeData _withGlassPreferences(
+    ThemeData theme,
+    double value,
+    bool forceGlassEffects,
+  ) {
     final clarity = normalizeMornyeGlassClarity(value);
-    if (theme.extension<MornyeTheme>()!.glassClarity == clarity) return theme;
+    final preferences = theme.extension<MornyeTheme>()!;
+    if (preferences.glassClarity == clarity &&
+        preferences.forceGlassEffects == forceGlassEffects) {
+      return theme;
+    }
     return theme.copyWith(
       extensions: [
         for (final extension in theme.extensions.values)
           if (extension is MornyeTheme)
-            extension.copyWith(glassClarity: clarity)
+            extension.copyWith(
+              glassClarity: clarity,
+              forceGlassEffects: forceGlassEffects,
+            )
           else
             extension,
       ],
@@ -177,6 +197,7 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
       accent: preferences?.accent ?? MornyeAccent.red,
       useSystemFont: preferences?.useSystemFont ?? false,
       glassClarity: preferences?.glassClarity ?? kDefaultMornyeGlassClarity,
+      forceGlassEffects: preferences?.forceGlassEffects ?? false,
     );
   }
 
@@ -191,7 +212,8 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
     final foreground = dark ? Colors.white : Colors.black;
     final surface = dark ? Colors.black : Colors.white;
     final grouped = dark ? const Color(0xff1c1c1e) : const Color(0xfff2f2f7);
-    final secondary = dark ? const Color(0xff98989f) : const Color(0xff6c6c70);
+    // Secondary labels also sit on colored glass, rather than only black/white.
+    final secondary = dark ? const Color(0xffc2c6d2) : const Color(0xff565a66);
     final scheme =
         ColorScheme.fromSeed(
           seedColor: accent,
@@ -394,11 +416,13 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
     MornyeAccent? accent,
     bool? useSystemFont,
     double? glassClarity,
+    bool? forceGlassEffects,
   }) => MornyeTheme(
     chromeSurface: chromeSurface ?? this.chromeSurface,
     accent: accent ?? this.accent,
     useSystemFont: useSystemFont ?? this.useSystemFont,
     glassClarity: glassClarity ?? this.glassClarity,
+    forceGlassEffects: forceGlassEffects ?? this.forceGlassEffects,
   );
 
   @override
@@ -411,6 +435,9 @@ class MornyeTheme extends ThemeExtension<MornyeTheme> {
     glassClarity:
         glassClarity +
         ((other?.glassClarity ?? glassClarity) - glassClarity) * t,
+    forceGlassEffects: t < 0.5
+        ? forceGlassEffects
+        : other?.forceGlassEffects ?? forceGlassEffects,
   );
 }
 
@@ -418,8 +445,8 @@ extension MornyeThemeContext on BuildContext {
   bool get isMornye => Theme.of(this).extension<MornyeTheme>() != null;
 }
 
-/// Settings uses iOS's inset grouped surfaces while the music library keeps
-/// its artwork-led, plain background.
+/// Inset settings groups share the app canvas, with an opaque fallback when
+/// hosted without the artwork background (for example standalone previews).
 class MornyeSettingsTheme extends StatelessWidget {
   const MornyeSettingsTheme({super.key, required this.child});
 
@@ -434,7 +461,9 @@ class MornyeSettingsTheme extends StatelessWidget {
     final group = dark ? const Color(0xff1c1c1e) : Colors.white;
     return Theme(
       data: theme.copyWith(
-        scaffoldBackgroundColor: background,
+        scaffoldBackgroundColor: theme.scaffoldBackgroundColor.a == 0
+            ? Colors.transparent
+            : background,
         extensions: [
           for (final extension in theme.extensions.values)
             if (extension is AppTokens)
@@ -446,9 +475,18 @@ class MornyeSettingsTheme extends StatelessWidget {
           surface: background,
           surfaceContainer: group,
         ),
-        appBarTheme: theme.appBarTheme.copyWith(backgroundColor: background),
+        appBarTheme: theme.appBarTheme.copyWith(
+          backgroundColor: theme.scaffoldBackgroundColor.a == 0
+              ? Colors.transparent
+              : background,
+        ),
       ),
-      child: ColoredBox(color: background, child: child),
+      child: ColoredBox(
+        color: theme.scaffoldBackgroundColor.a == 0
+            ? Colors.transparent
+            : background,
+        child: child,
+      ),
     );
   }
 }

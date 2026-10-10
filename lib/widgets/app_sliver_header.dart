@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:spotiflac_android/theme/app_tokens.dart';
 import 'package:spotiflac_android/theme/mornye_theme.dart';
+import 'package:spotiflac_android/widgets/mornye_chrome.dart';
 import 'package:spotiflac_android/utils/adaptive_layout.dart';
 import 'package:spotiflac_android/utils/app_bar_layout.dart';
 
@@ -52,7 +53,9 @@ class AppSliverHeader extends StatelessWidget {
       collapsedHeight: kToolbarHeight,
       floating: false,
       pinned: true,
-      backgroundColor: colorScheme.surface,
+      backgroundColor: context.isMornye
+          ? Colors.transparent
+          : colorScheme.surface,
       surfaceTintColor: Colors.transparent,
       automaticallyImplyLeading: false,
       leadingWidth: _showLeading ? kToolbarHeight + edgeInset : null,
@@ -102,7 +105,7 @@ class AppSliverHeader extends StatelessWidget {
                       tokens.headerCollapsedTitleSize) *
                   expandRatio;
 
-          return FlexibleSpaceBar(
+          final titleBar = FlexibleSpaceBar(
             centerTitle: false,
             expandedTitleScale: 1.0,
             titlePadding: EdgeInsets.only(
@@ -123,6 +126,23 @@ class AppSliverHeader extends StatelessWidget {
                 color: colorScheme.onSurface,
               ),
             ),
+          );
+          if (!context.isMornye) return titleBar;
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              Positioned.fill(
+                child: Opacity(
+                  opacity: 1 - expandRatio,
+                  child: const MornyeGlassPanel(
+                    radius: 0,
+                    strongTint: true,
+                    child: SizedBox.expand(),
+                  ),
+                ),
+              ),
+              titleBar,
+            ],
           );
         },
       ),

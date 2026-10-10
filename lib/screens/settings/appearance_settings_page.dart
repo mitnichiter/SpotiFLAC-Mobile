@@ -113,6 +113,7 @@ class AppearanceSettingsPage extends ConsumerWidget {
                           .setMornyeAccent,
                     ),
                     const _MornyeGlassClaritySlider(),
+                    const _ForceBlurSettingsSwitch(),
                   ],
                 ),
               ),
@@ -196,17 +197,10 @@ class AppearanceSettingsPage extends ConsumerWidget {
                     onChanged: (value) => ref
                         .read(settingsProvider.notifier)
                         .setHeroAnimationsEnabled(value),
+                    showDivider: themeSettings.style != AppThemeStyle.mornye,
                   ),
-                  SettingsSwitchItem(
-                    icon: Icons.blur_on,
-                    title: context.l10n.appearanceForceBlur,
-                    subtitle: context.l10n.appearanceForceBlurSubtitle,
-                    value: settings.forceBackdropBlur,
-                    onChanged: (value) => ref
-                        .read(settingsProvider.notifier)
-                        .setForceBackdropBlur(value),
-                    showDivider: false,
-                  ),
+                  if (themeSettings.style != AppThemeStyle.mornye)
+                    const _ForceBlurSettingsSwitch(),
                 ],
               ),
             ),
@@ -483,6 +477,22 @@ class _ThemePreviewCard extends StatelessWidget {
   }
 }
 
+class _ForceBlurSettingsSwitch extends ConsumerWidget {
+  const _ForceBlurSettingsSwitch();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => SettingsSwitchItem(
+    icon: Icons.blur_on,
+    title: context.l10n.appearanceForceBlur,
+    subtitle: context.isMornye
+        ? context.l10n.appearanceForceGlassSubtitle
+        : context.l10n.appearanceForceBlurSubtitle,
+    value: ref.watch(settingsProvider.select((s) => s.forceBackdropBlur)),
+    onChanged: ref.read(settingsProvider.notifier).setForceBackdropBlur,
+    showDivider: false,
+  );
+}
+
 class _MornyeGlassClaritySlider extends ConsumerWidget {
   const _MornyeGlassClaritySlider();
 
@@ -496,7 +506,7 @@ class _MornyeGlassClaritySlider extends ConsumerWidget {
     final l10n = context.l10n;
     // Flat devices and high contrast draw every glass surface opaque, so the
     // slider would change nothing visible. Keep the stored value untouched.
-    final highContrast = MediaQuery.highContrastOf(context);
+    final highContrast = MornyeTheme.glassBlockedByHighContrast(context);
     final adjustable = !highContrast && ref.watch(mornyeBlurEnabledProvider);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -544,30 +554,41 @@ class _MornyeGlassClaritySlider extends ConsumerWidget {
                     ],
                   ),
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(18),
-                  child: MornyeGlassPanel(
-                    radius: 22,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 14,
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.music_note_rounded),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              'Mornye',
-                              style: theme.textTheme.titleMedium,
-                            ),
-                          ),
-                          const Icon(Icons.play_arrow_rounded),
-                        ],
+                child: Stack(
+                  children: [
+                    const Positioned.fill(
+                      child: CustomPaint(
+                        painter: _GlassPreviewBackdropPainter(),
                       ),
                     ),
-                  ),
+                    Padding(
+                      padding: const EdgeInsets.all(18),
+                      child: MornyeGlassPanel(
+                        key: const ValueKey('mornye-glass-preview'),
+                        independentBackdrop: true,
+                        radius: 22,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 14,
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.music_note_rounded),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'Mornye',
+                                  style: theme.textTheme.titleMedium,
+                                ),
+                              ),
+                              const Icon(Icons.play_arrow_rounded),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -610,6 +631,36 @@ class _MornyeGlassClaritySlider extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// Sharp backdrop details let the preview demonstrate actual blur/refraction,
+/// which cannot be judged from a smooth gradient alone.
+class _GlassPreviewBackdropPainter extends CustomPainter {
+  const _GlassPreviewBackdropPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawCircle(
+      Offset(size.width * 0.18, size.height * 0.7),
+      size.height * 0.38,
+      Paint()..color = Colors.black.withValues(alpha: 0.38),
+    );
+    canvas.drawCircle(
+      Offset(size.width * 0.82, size.height * 0.35),
+      size.height * 0.33,
+      Paint()..color = Colors.white.withValues(alpha: 0.22),
+    );
+    canvas.drawLine(
+      Offset(size.width * 0.38, -20),
+      Offset(size.width * 0.58, size.height + 20),
+      Paint()
+        ..color = Colors.white.withValues(alpha: 0.5)
+        ..strokeWidth = 12,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_GlassPreviewBackdropPainter oldDelegate) => false;
 }
 
 class _MornyeAccentPicker extends StatelessWidget {

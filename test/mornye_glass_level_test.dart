@@ -1,6 +1,7 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:spotiflac_android/models/theme_settings.dart';
@@ -29,6 +30,89 @@ MornyeGlassLevel _levelFor({
 }
 
 void main() {
+  for (final level in [MornyeGlassLevel.liquid, MornyeGlassLevel.frosted]) {
+    for (final clarity in [0.75, 1.0]) {
+      testWidgets(
+        'glass blurs sharp backdrop pixels ($level, clarity $clarity)',
+        (tester) async {
+          Future<int> backdropContrast(bool samplesBackdrop) async {
+            final capture = GlobalKey();
+            await tester.pumpWidget(
+              ProviderScope(
+                key: UniqueKey(),
+                overrides: [mornyeGlassLevelProvider.overrideWithValue(level)],
+                child: MaterialApp(
+                  theme: MornyeTheme.build(
+                    Brightness.dark,
+                    glassClarity: clarity,
+                    forceGlassEffects: true,
+                  ),
+                  home: MediaQuery(
+                    data: const MediaQueryData(highContrast: true),
+                    child: Center(
+                      child: RepaintBoundary(
+                        key: capture,
+                        child: SizedBox(
+                          width: 160,
+                          height: 80,
+                          child: Stack(
+                            children: [
+                              const Positioned.fill(
+                                child: CustomPaint(painter: _StripeBackdrop()),
+                              ),
+                              Positioned(
+                                left: 20,
+                                top: 12,
+                                width: 120,
+                                height: 56,
+                                child: MornyeGlass.navigation(
+                                  blurEnabled: true,
+                                  samplesBackdrop: samplesBackdrop,
+                                  child: const SizedBox.expand(),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+            await tester.pumpAndSettle();
+            return (await tester.runAsync(() async {
+              final boundary = tester.renderObject<RenderRepaintBoundary>(
+                find.byKey(capture),
+              );
+              final image = await boundary.toImage();
+              try {
+                final bytes = (await image.toByteData())!;
+                var darkest = 255;
+                var lightest = 0;
+                // Stay away from the curved rim; measure detail in the glass.
+                for (var x = 44; x < 116; x++) {
+                  final red = bytes.getUint8((40 * image.width + x) * 4);
+                  if (red < darkest) darkest = red;
+                  if (red > lightest) lightest = red;
+                }
+                return lightest - darkest;
+              } finally {
+                image.dispose();
+              }
+            }))!;
+          }
+
+          final transparentOnly = await backdropContrast(false);
+          final blurred = await backdropContrast(true);
+          expect(transparentOnly, greaterThan(20));
+          expect(blurred, lessThan(transparentOnly / 2));
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
   test('runtime tiers map to Mornye glass levels', () {
     // Low tier: arm32-only or low-RAM Android.
     expect(
@@ -58,6 +142,84 @@ void main() {
       );
     }
   });
+
+  for (final (forceGlass, reducedMotion) in [
+    (false, false),
+    (true, false),
+    (true, true),
+  ]) {
+    testWidgets('contrast override restores sheets and navigation '
+        '(forced: $forceGlass, reduced motion: $reducedMotion)', (
+      tester,
+    ) async {
+      bool? floatingNavigation;
+      const sheetKey = ValueKey('contrast-sheet');
+      const navigationKey = ValueKey('contrast-navigation');
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: MornyeTheme.build(
+              Brightness.dark,
+              forceGlassEffects: forceGlass,
+            ),
+            home: MediaQuery(
+              data: MediaQueryData(
+                highContrast: true,
+                disableAnimations: reducedMotion,
+              ),
+              child: Builder(
+                builder: (context) {
+                  floatingNavigation = MornyeTabBar.usesLiquidGlass(
+                    context,
+                    blurEnabled: true,
+                    liquidGlass: true,
+                  );
+                  return Scaffold(
+                    body: Column(
+                      children: [
+                        const MornyeGlassPanel.overlay(
+                          key: sheetKey,
+                          child: SizedBox(width: 300, height: 100),
+                        ),
+                        MornyeTabBar(
+                          key: navigationKey,
+                          destinations: const [
+                            NavigationDestination(
+                              icon: Icon(Icons.home),
+                              label: 'Home',
+                            ),
+                          ],
+                          selectedIndex: 0,
+                          onSelected: (_) {},
+                          blurEnabled: true,
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      for (final key in [sheetKey, navigationKey]) {
+        expect(
+          find.descendant(
+            of: find.byKey(key),
+            matching: find.byType(BackdropFilter),
+          ),
+          forceGlass ? findsOneWidget : findsNothing,
+        );
+        expect(
+          MediaQuery.highContrastOf(tester.element(find.byKey(key))),
+          isTrue,
+        );
+      }
+      expect(floatingNavigation, forceGlass && !reducedMotion);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('frosted level keeps blur but drops every shader surface', (
     tester,
@@ -156,13 +318,13 @@ void main() {
     );
     expect(
       await filterFor(kDefaultMornyeGlassClarity, true),
-      ui.ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+      ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
     );
     expect(
       await filterFor(1, false),
       ui.ImageFilter.blur(sigmaX: 3, sigmaY: 3),
     );
-    expect(await filterFor(1, true), ui.ImageFilter.blur(sigmaX: 2, sigmaY: 2));
+    expect(await filterFor(1, true), ui.ImageFilter.blur(sigmaX: 8, sigmaY: 8));
   });
 
   for (final clarity in [0.0, 0.5]) {
@@ -285,7 +447,7 @@ void main() {
         of: find.byType(ExtensionRepoCard),
         matching: find.byType(BackdropFilter),
       ),
-      findsNothing,
+      findsOneWidget,
     );
     // Same translucent material, so the page looks identical behind it.
     expect(tintOf(plain), tintOf(sampled));
@@ -327,4 +489,21 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+}
+
+class _StripeBackdrop extends CustomPainter {
+  const _StripeBackdrop();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (var x = 0.0; x < size.width; x += 4) {
+      canvas.drawRect(
+        Rect.fromLTWH(x, 0, 4, size.height),
+        Paint()..color = (x / 4).toInt().isEven ? Colors.black : Colors.white,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_StripeBackdrop oldDelegate) => false;
 }

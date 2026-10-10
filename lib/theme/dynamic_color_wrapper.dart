@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:material_ui/material_ui.dart' as material_ui;
 import 'package:spotiflac_android/providers/theme_provider.dart';
+import 'package:spotiflac_android/providers/settings_provider.dart';
 import 'package:spotiflac_android/theme/app_theme.dart';
 import 'package:spotiflac_android/models/theme_settings.dart';
 import 'package:spotiflac_android/theme/mornye_theme.dart';
@@ -18,18 +19,23 @@ class DynamicColorWrapper extends ConsumerWidget {
     final themeSettings = ref.watch(themeProvider);
 
     if (themeSettings.style == AppThemeStyle.mornye) {
+      final forceGlassEffects = ref.watch(
+        settingsProvider.select((settings) => settings.forceBackdropBlur),
+      );
       return builder(
         MornyeTheme.build(
           Brightness.light,
           accent: themeSettings.mornyeAccent,
           useSystemFont: themeSettings.useSystemFont,
           glassClarity: themeSettings.mornyeGlassClarity,
+          forceGlassEffects: forceGlassEffects,
         ),
         MornyeTheme.build(
           Brightness.dark,
           accent: themeSettings.mornyeAccent,
           useSystemFont: themeSettings.useSystemFont,
           glassClarity: themeSettings.mornyeGlassClarity,
+          forceGlassEffects: forceGlassEffects,
         ),
         themeSettings.themeMode,
       );

@@ -11,7 +11,7 @@ class MornyeLiquidBackdrop extends StatelessWidget {
     required this.child,
     this.interaction = false,
     this.progress = 1,
-    this.refractionDepth = 0.30,
+    this.refractionDepth = 0.50,
     this.refractionWidth = 20,
   });
 
@@ -32,13 +32,13 @@ class MornyeLiquidBackdrop extends StatelessWidget {
       style: LiquidGlassStyle(
         shape: LiquidGlassShape.roundedRectangle(
           cornerRadius: borderRadius.topLeft.x,
-          borderWidth: 0.75,
+          borderWidth: 1,
           lightDirection: 0,
-          lightIntensity: 0.25 * effect,
+          lightIntensity: 0.65 * effect,
           lightColor: Colors.white,
           borderType: const OpticalBorder(
-            ambientIntensity: 0.05,
-            lightSpread: 0.2,
+            ambientIntensity: 0.12,
+            lightSpread: 0.3,
           ),
         ),
         appearance: LiquidGlassAppearance(
