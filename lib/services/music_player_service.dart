@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:spotiflac_android/services/cast/cast_service.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/services.dart';
 import 'package:spotiflac_android/services/playback_notification.dart';
@@ -332,6 +333,156 @@ class MusicPlayerHandler extends BaseAudioHandler
   Future<void>? _disposeFuture;
   bool _initialized = false;
   bool _sourceReady = false;
+  CastService? _cast;
+  StreamSubscription<Map<String, dynamic>>? _castSubscription;
+  StreamSubscription<List<MediaItem>>? _castQueueSubscription;
+  StreamSubscription<dynamic>? _castPresentationSubscription;
+  bool get casting => _cast?.connected == true;
+  bool _castAutoplay = true;
+
+  Future<bool> _castCommand(Future<void> Function() command) async {
+    try {
+      await command();
+      return true;
+    } catch (error) {
+      _cast?.error = error.toString();
+      _cast?.reportError();
+      _broadcastState(playerState: PlayerState.paused);
+      return false;
+    }
+  }
+
+  Future<void> _handleCastCommand(Map<String, dynamic> event) async {
+    switch (event['action']) {
+      case 'next':
+        await skipToNext();
+      case 'previous':
+        await skipToPrevious();
+      case 'shuffle':
+        await setShuffleMode(
+          _shuffle ? AudioServiceShuffleMode.none : AudioServiceShuffleMode.all,
+        );
+      case 'repeat':
+        await setRepeatMode(switch (_repeatMode) {
+          AudioServiceRepeatMode.none => AudioServiceRepeatMode.all,
+          AudioServiceRepeatMode.all => AudioServiceRepeatMode.one,
+          _ => AudioServiceRepeatMode.none,
+        });
+      case 'favorite':
+        await customAction(PlaybackNotification.favoriteAction);
+      case 'jump':
+        final index = (event['index'] as num?)?.toInt() ?? -1;
+        if (index >= 0 && index < _media.length) await skipToQueueItem(index);
+      case 'disconnect':
+        await _castCommand(_cast!.disconnect);
+    }
+    await _sendCastQueue();
+  }
+
+  Future<void> _sendCastQueue() async {
+    final cast = _cast;
+    if (cast == null || !casting || _disposed) return;
+    final start = max(0, _index - 10);
+    try {
+      await cast.send({
+        'type': 'queue',
+        'currentIndex': _index,
+        'shuffle': _shuffle,
+        'repeat': _repeatMode.name,
+        'loved': _runtime.notification.loved,
+        'items': queue.value
+            .skip(start)
+            .take(50)
+            .indexed
+            .map(
+              (entry) => {
+                'index': start + entry.$1,
+                'title': String.fromCharCodes(entry.$2.title.runes.take(120)),
+                'artist': String.fromCharCodes(
+                  (entry.$2.artist ?? '').runes.take(120),
+                ),
+              },
+            )
+            .toList(),
+      });
+    } catch (error) {
+      cast.error = error.toString();
+      cast.reportError();
+    }
+  }
+
+  Future<void> useCast(CastService cast) async {
+    if (!identical(_cast, cast)) {
+      await _castSubscription?.cancel();
+      _cast = cast;
+      await _castQueueSubscription?.cancel();
+      await _castPresentationSubscription?.cancel();
+      _castPresentationSubscription = playbackState
+          .map(
+            (state) => (
+              state.queueIndex,
+              state.shuffleMode,
+              state.repeatMode,
+              _runtime.notification.loved,
+            ),
+          )
+          .distinct()
+          .listen((_) => unawaited(_sendCastQueue()));
+      _castQueueSubscription = queue.listen((_) => unawaited(_sendCastQueue()));
+      _castSubscription = cast.events.listen((event) {
+        if (_disposed) return;
+        if (event['type'] == 'disconnected') {
+          _playRequestGeneration++;
+          _sourceReady = false;
+          _userPaused = true;
+          _broadcastState(playerState: PlayerState.paused);
+          unawaited(_persistSession(position: playbackState.value.position));
+        } else if (event['type'] == 'status' &&
+            casting &&
+            event['mediaId'] == mediaItem.value?.id) {
+          if (event['playing'] == true) {
+            _userPaused = false;
+            _pausedByInterruption = false;
+          }
+          final ms = (event['positionMs'] as num?)?.toInt() ?? 0;
+          _broadcastPosition(Duration(milliseconds: ms), force: true);
+          final duration = (event['durationMs'] as num?)?.toInt() ?? 0;
+          final item = mediaItem.value;
+          if (item != null &&
+              duration > 0 &&
+              item.duration?.inMilliseconds != duration) {
+            mediaItem.add(
+              item.copyWith(duration: Duration(milliseconds: duration)),
+            );
+          }
+          _broadcastState(
+            playerState: event['playing'] == true
+                ? PlayerState.playing
+                : PlayerState.paused,
+            loading: event['buffering'] == true,
+          );
+        } else if (event['type'] == 'suspended' && casting) {
+          _broadcastState(playerState: PlayerState.paused, loading: true);
+        } else if (event['type'] == 'finished' &&
+            casting &&
+            event['mediaId'] == mediaItem.value?.id) {
+          unawaited(_handlePlayerComplete());
+        } else if (event['type'] == 'command' && casting) {
+          unawaited(_handleCastCommand(event));
+        } else if (event['type'] == 'error' && casting) {
+          _broadcastState(playerState: PlayerState.paused);
+        }
+      });
+    }
+    final position = playbackState.value.position;
+    _castAutoplay = playbackState.value.playing;
+    await _autoMix.cancel();
+    await _player.pause();
+    if (_index >= 0) {
+      await _playIndex(_index, recordHistory: false, startPosition: position);
+    }
+  }
+
   Future<void>? _activePlayOperation;
   Future<void> _sourceChangeTail = Future<void>.value();
   Timer? _sleepTimer;
@@ -526,7 +677,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     );
     _playerSubscriptions[player] = [
       player.onPlayerStateChanged.listen((state) {
-        if (!identical(player, _player)) return;
+        if (!identical(player, _player) || casting) return;
         if (state == PlayerState.paused && player.needsSourceReload) {
           _userPaused = true;
           _pausedByInterruption = false;
@@ -547,7 +698,9 @@ class MusicPlayerHandler extends BaseAudioHandler
         _broadcastState(playerState: state);
       }),
       player.onPositionChanged.listen((position) {
-        if (identical(player, _player)) _handlePositionChanged(position);
+        if (identical(player, _player) && !casting) {
+          _handlePositionChanged(position);
+        }
       }),
       player.onDurationChanged.listen((duration) {
         if (!identical(player, _player) || !_sourceReady) return;
@@ -557,7 +710,9 @@ class MusicPlayerHandler extends BaseAudioHandler
         }
       }),
       player.onPlayerComplete.listen((_) {
-        if (identical(player, _player)) unawaited(_handlePlayerComplete());
+        if (identical(player, _player) && !casting) {
+          unawaited(_handlePlayerComplete());
+        }
       }),
     ];
   }
@@ -773,7 +928,13 @@ class MusicPlayerHandler extends BaseAudioHandler
   }
 
   void _broadcastState({PlayerState? playerState, bool? loading}) {
-    final state = playerState ?? _player.state;
+    final state =
+        playerState ??
+        (casting
+            ? playbackState.value.playing
+                  ? PlayerState.playing
+                  : PlayerState.paused
+            : _player.state);
     final playing = state == PlayerState.playing;
 
     playbackState.add(
@@ -1117,7 +1278,7 @@ class MusicPlayerHandler extends BaseAudioHandler
     // During restore/source preparation the engine may report a stale zero (or
     // the previous source). The broadcast position already represents the
     // intended start point for the current queue item.
-    if (!_sourceReady) return playbackState.value.position;
+    if (!_sourceReady || casting) return playbackState.value.position;
     try {
       final position = await _player.getCurrentPosition();
       if (position != null) return position;
@@ -1356,6 +1517,9 @@ class MusicPlayerHandler extends BaseAudioHandler
         await _autoMix.cancel();
         if (!_isCurrentPlayRequest(generation, media)) return;
         // Retire the audible source before publishing another song's title.
+        if (casting && _cast!.hasLoadedMedia) {
+          await _castCommand(_cast!.stop);
+        }
         await _player.stop();
         if (!_isCurrentPlayRequest(generation, media)) return;
         await _loadIndex(
@@ -1451,6 +1615,50 @@ class MusicPlayerHandler extends BaseAudioHandler
       } catch (_) {
         // Cover failure must not prevent audio playback.
       }
+    }
+
+    if (casting) {
+      final cast = _cast!;
+      try {
+        final resolved = await _resolveSource(media);
+        if (!_isCurrentPlayRequest(generation, media) || !casting) return;
+        if (resolved == null) {
+          throw StateError('The audio source is unavailable');
+        }
+        _activeResolvedPath = media.isContentUri ? resolved : null;
+        final item = _toMediaItem(
+          media,
+          resolvedSource: resolved,
+          resolvedArtwork: mediaItem.value?.artUri?.toString(),
+        );
+        mediaItem.add(item);
+        final autoplay = _castAutoplay;
+        _castAutoplay = true;
+        await cast.load(
+          item,
+          resolved,
+          effectiveStartPosition,
+          autoplay: autoplay,
+        );
+        if (!_isCurrentPlayRequest(generation, media) || !casting) return;
+        _sourceReady = true;
+        _pendingRestorePosition = null;
+        _broadcastPosition(effectiveStartPosition, force: true);
+        _broadcastState(
+          playerState: autoplay ? PlayerState.playing : PlayerState.paused,
+        );
+        await _cleanupPendingResolvedPaths();
+        unawaited(_persistSession(position: effectiveStartPosition));
+        unawaited(_sendCastQueue());
+      } catch (error) {
+        if (_isCurrentPlayRequest(generation, media)) {
+          cast.error = error.toString();
+          cast.reportError();
+          _sourceReady = false;
+          _broadcastState(playerState: PlayerState.paused);
+        }
+      }
+      return;
     }
 
     // Android opens SAF files through a short-lived file-descriptor lease.
@@ -1767,6 +1975,20 @@ class MusicPlayerHandler extends BaseAudioHandler
     _pausedByInterruption = false;
     _interruptionActive = false;
     _userPaused = false;
+    if (casting && _sourceReady) {
+      await _castCommand(_cast!.play);
+      return;
+    }
+    if (casting) {
+      if (_index >= 0) {
+        await _playIndex(
+          _index,
+          recordHistory: false,
+          startPosition: playbackState.value.position,
+        );
+      }
+      return;
+    }
     if (_player.needsSourceReload) {
       final generation = _playRequestGeneration;
       final index = _index;
@@ -1837,6 +2059,16 @@ class MusicPlayerHandler extends BaseAudioHandler
   }
 
   Future<void> _pausePlayback() async {
+    if (casting) {
+      _userPaused = true;
+      if (!_sourceReady) {
+        _playRequestGeneration++;
+        _cast!.cancelPendingLoad();
+      }
+      await _castCommand(_cast!.pause);
+      _broadcastState(playerState: PlayerState.paused);
+      return;
+    }
     final generation = ++_playRequestGeneration;
     _switchingGeneration = 0;
     _userPaused = true;
@@ -1852,6 +2084,12 @@ class MusicPlayerHandler extends BaseAudioHandler
 
   @override
   Future<void> seek(Duration position) async {
+    if (casting) {
+      if (await _castCommand(() => _cast!.seek(position))) {
+        _broadcastPosition(position, force: true);
+      }
+      return;
+    }
     await _autoMix.cancel();
     await _player.seek(position);
     _broadcastPosition(position, force: true);
@@ -1911,6 +2149,10 @@ class MusicPlayerHandler extends BaseAudioHandler
 
   Future<void> _stopSession(int generation) async {
     if (generation != _playRequestGeneration || _disposed) return;
+    if (casting) {
+      _cast!.cancelPendingLoad();
+      await _castCommand(_cast!.stop);
+    }
     await _player.stop();
     if (generation != _playRequestGeneration || _disposed) return;
     _sourceReady = false;
@@ -1946,7 +2188,7 @@ class MusicPlayerHandler extends BaseAudioHandler
   Future<void> skipToPrevious() async {
     await _autoMix.cancel();
     if (playbackState.value.position > const Duration(seconds: 3)) {
-      await _player.seek(Duration.zero);
+      await seek(Duration.zero);
       _broadcastPosition(Duration.zero, force: true);
       return;
     }
@@ -1956,7 +2198,7 @@ class MusicPlayerHandler extends BaseAudioHandler
         final prev = _playHistory.last;
         await _playIndex(prev, recordHistory: false);
       } else {
-        await _player.seek(Duration.zero);
+        await seek(Duration.zero);
         _broadcastPosition(Duration.zero, force: true);
       }
       return;
@@ -2065,6 +2307,10 @@ class MusicPlayerHandler extends BaseAudioHandler
   Future<void> dispose() => _disposeFuture ??= _dispose();
 
   Future<void> _dispose() async {
+    await _castSubscription?.cancel();
+    await _castQueueSubscription?.cancel();
+    await _castPresentationSubscription?.cancel();
+    if (casting) await _cast!.disconnect();
     _autoplay.reset();
     _disposed = true;
     if (identical(musicPlayerRuntime.handler, this)) {

@@ -978,6 +978,9 @@ class MainActivity: FlutterFragmentActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         PlayerWidgetBridge.attach(this, flutterEngine)
+        if (!flutterEngine.plugins.has(SpotiCastPlugin::class.java)) {
+            flutterEngine.plugins.add(SpotiCastPlugin())
+        }
         // Select and initialize the runtime before Flutter can dispatch a call.
         val selectedBackend = coreBackend
         sweepStaleCacheFiles()

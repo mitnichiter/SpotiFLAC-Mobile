@@ -7153,5 +7153,30 @@
   "optionsEmbeddedCoverSizeOriginal": "Original resolution",
   "@optionsEmbeddedCoverSizeOriginal": {
     "description": "Option that preserves the provider artwork at its original resolution"
+  },
+  "castTitle": "Cast to TV",
+  "castHello": "Hello",
+  "castHelloName": "Hello, {name}",
+  "@castHelloName": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "castSameWifi": "Connect your phone and TV to the same Wi-Fi network.",
+  "castNotConfigured": "TV casting is not enabled in this build.",
+  "castVolume": "TV volume",
+  "castDisconnect": "Stop casting",
+  "castSearching": "Searching for Cast devices…",
+  "castConnecting": "Connecting to your TV…",
+  "castReconnecting": "Reconnecting to your TV…",
+  "castError": "Casting failed: {message}",
+  "@castError": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
   }
 }

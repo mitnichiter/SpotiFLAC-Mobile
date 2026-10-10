@@ -1,0 +1,52 @@
+/* Layout and values follow MornyeLandscapePlayer, PlayerPlaybackControls,
+   MornyePlayerSlider and MaterialPlayerLayout. Theme colors come from Flutter. */
+@font-face { font-family: Inter; src: url('fonts/InterVariable.ttf'); font-weight: 100 900; }
+@font-face { font-family: 'Google Sans Flex'; src: url('fonts/GoogleSansFlex.ttf'); font-weight: 100 900; }
+:root { color-scheme: dark; --surface:#343434; --ink:#fff; --muted:#ffffffb8; --accent:#e03d3c; --on-accent:#fff; --unit: min(1vw, 1.78vh); --font:Inter,system-ui,sans-serif; }
+* { box-sizing:border-box; }
+body { margin:0; height:100vh; overflow:hidden; background:var(--surface); color:var(--ink); font-family:var(--font); }
+#ambience { position:fixed; inset:0; z-index:-1; background:linear-gradient(135deg,#626262,#343434); }
+#ambience-fade { position:absolute; inset:0; opacity:0; transition:opacity .38s ease; }
+header { height:10vh; padding:0 4vw; display:flex; align-items:center; justify-content:space-between; font-size:calc(var(--unit)*1.55); }
+#session-label { opacity:.7; } #greeting { max-width:60%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:500; }
+main { display:grid; grid-template-columns:1fr 1fr; height:84vh; padding:0 2vw 2vh; gap:1vw; }
+#artwork-pane { display:grid; place-items:center; min-width:0; }
+#cover-frame { width:min(44vw,76vh); aspect-ratio:1; border-radius:calc(var(--unit)*1.2); overflow:hidden; background:#ffffff12; display:grid; place-items:center; box-shadow:0 2vh 4vh #0002; }
+#cover { width:100%; height:100%; object-fit:cover; } #placeholder { font-size:15vh; opacity:.7; }
+#content-pane { position:relative; min-width:0; display:flex; flex-direction:column; padding:2vh 3vw 0; }
+.track-header { display:flex; align-items:center; gap:.7vw; min-height:9vh; }
+.titles { flex:1; min-width:0; } h1 { margin:0; font-size:calc(var(--unit)*2.1); font-weight:600; letter-spacing:-.025em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#artist { margin:.7vh 0 0; color:var(--muted); font-size:calc(var(--unit)*1.85); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#player-pane { flex:1; display:flex; flex-direction:column; justify-content:space-evenly; padding:3vh 0 5vh; }
+.timeline { padding:0 1vw; } input { appearance:none; width:100%; height:calc(var(--unit)*.55); border-radius:10px; background:linear-gradient(to right,var(--ink) var(--progress,0%),#ffffff2e var(--progress,0%)); cursor:pointer; }
+input::-webkit-slider-thumb { appearance:none; width:0; height:0; } input:focus-visible { outline:3px solid var(--ink); outline-offset:8px; }
+.time-labels { display:flex; justify-content:space-between; align-items:center; padding-top:1.3vh; color:var(--muted); font-size:calc(var(--unit)*1.3); font-variant-numeric:tabular-nums; } #quality { font-size:calc(var(--unit)*1.1); }
+#transport { display:flex; align-items:center; justify-content:space-evenly; padding:0 1vw; }
+button { border:0; background:transparent; color:inherit; border-radius:50%; width:calc(var(--unit)*5.5); height:calc(var(--unit)*5.5); padding:calc(var(--unit)*1.2); cursor:pointer; font:inherit; }
+button svg { display:block; width:100%; height:100%; fill:currentColor; } #transport button { width:calc(var(--unit)*7.2); height:calc(var(--unit)*7.2); } #transport .primary { width:calc(var(--unit)*8.2); height:calc(var(--unit)*8.2); padding:calc(var(--unit)*1.1); }
+button:focus-visible { outline:3px solid var(--ink); outline-offset:5px; background:#ffffff14; } button[aria-pressed="true"] { background:#ffffff29; } button.selected { color:var(--accent); }
+.volume-row { display:flex; align-items:center; padding:0 2vw; gap:1vw; opacity:.9; } .volume-row svg { width:calc(var(--unit)*1.8); height:calc(var(--unit)*1.8); fill:currentColor; opacity:.54; } #volume { --progress:50%; }
+#tabs { display:flex; align-items:center; justify-content:space-between; padding:0 .5vw; height:9vh; }
+#lyrics-pane,#queue-pane { display:none; flex:1; min-height:0; margin-top:2vh; }
+#lyrics { height:100%; overflow:auto; scrollbar-width:none; padding:25vh 0; mask-image:linear-gradient(transparent,#000 10%,#000 90%,transparent); }
+#lyrics p { font-size:calc(var(--unit)*3.95); line-height:1.3; font-weight:600; margin:0 0 3vh; color:var(--muted); overflow-wrap:anywhere; transition:color .22s; }
+#lyrics .active { color:var(--ink); } #lyrics small { display:block; font-size:.45em; font-weight:400; margin-top:.6em; } #lyrics .empty { font-size:calc(var(--unit)*1.8); font-weight:400; }
+#queue-pane { overflow:auto; } #queue-pane h2 { font-size:calc(var(--unit)*2); } #queue button { width:100%; height:auto; border-radius:12px; text-align:left; display:block; padding:1.5vh 1vw; font-size:calc(var(--unit)*1.8); } #queue small { display:block; color:var(--muted); font-size:.8em; margin-top:.5vh; }
+body[data-page="lyrics"] #player-pane,body[data-page="queue"] #player-pane { display:none; } body[data-page="lyrics"] #lyrics-pane,body[data-page="queue"] #queue-pane { display:block; }
+#options { position:absolute; right:3vw; top:12vh; background:var(--surface); border:1px solid #ffffff22; border-radius:18px; padding:1vh; box-shadow:0 12px 36px #0005; z-index:2; } #options button { display:block; width:16vw; height:auto; padding:1.5vh; border-radius:12px; text-align:left; font-size:calc(var(--unit)*1.6); }
+#status { height:4vh; margin:0; text-align:center; font-size:calc(var(--unit)*1); color:var(--muted); } .material-mode { display:none; }
+body[data-theme="material"] #ambience { display:none; } body[data-theme="material"] #cover-frame { width:min(38vw,66vh); border-radius:20px; box-shadow:none; } body[data-theme="material"] .titles { text-align:center; } body[data-theme="material"] .primary { color:var(--on-accent); background:var(--accent); border-radius:24px; } body[data-theme="material"] .material-mode { display:block; } body[data-theme="material"] input { background:linear-gradient(to right,var(--accent) var(--progress,0%),color-mix(in srgb,var(--ink) 18%,transparent) var(--progress,0%)); } body[data-theme="material"] input::-webkit-slider-thumb { width:calc(var(--unit)*1.5); height:calc(var(--unit)*1.5); border-radius:50%; background:var(--accent); }
+@media (prefers-reduced-motion:reduce) { * { transition:none !important; scroll-behavior:auto !important; } }
+body.reduce-motion * { transition:none !important; scroll-behavior:auto !important; }
+
+html { overflow:hidden; }
+#content-pane { min-height:0; }
+.track-header,#tabs { flex-shrink:0; }
+#lyrics-pane,#queue-pane { height:0; overflow:hidden; }
+#queue-pane { overflow:auto; }
+
+/* Material's landscape player puts lyrics in the artwork pane while keeping
+   metadata and transport visible on the right, as MaterialPlayerLayout does. */
+body[data-theme="material"][data-page="lyrics"] #artwork-pane { visibility:hidden; }
+body[data-theme="material"][data-page="lyrics"] #player-pane { display:flex; }
+body[data-theme="material"][data-page="lyrics"] #lyrics-pane { position:fixed; left:4vw; top:12vh; width:41vw; height:78vh; margin:0; }

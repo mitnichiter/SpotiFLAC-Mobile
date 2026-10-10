@@ -21,6 +21,11 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
+val castReceiverAppId = providers.environmentVariable("SPOTIFLAC_CAST_APP_ID").orElse("").get()
+require(castReceiverAppId.isEmpty() || castReceiverAppId.matches(Regex("[A-Fa-f0-9]{8}"))) {
+    "SPOTIFLAC_CAST_APP_ID must be an eight-character Cast receiver application ID"
+}
+
 val rustBackendDir = rootProject.file("../rust_backend")
 val rustAndroidAbis = providers.environmentVariable("SPOTIFLAC_RUST_ANDROID_ABIS")
     .orElse("arm64-v8a,armeabi-v7a")
@@ -91,6 +96,7 @@ android {
 
     defaultConfig {
         applicationId = "com.zarz.spotiflac"
+        buildConfigField("String", "CAST_RECEIVER_APP_ID", "\"$castReceiverAppId\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         minSdk = flutter.minSdkVersion
         targetSdk = 37
@@ -193,6 +199,7 @@ dependencies {
     if (discordSdkEnabled && discordSdk.exists()) {
         implementation(files(discordSdk))
     }
+    implementation("com.google.android.gms:play-services-cast-framework:21.5.0")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
     implementation("net.java.dev.jna:jna:5.19.1@aar")
 

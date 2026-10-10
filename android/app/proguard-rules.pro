@@ -68,3 +68,6 @@
 # Flutter invokes the generated registrant by name. Individual plugins are
 # referenced by this class and retain their own consumer rules.
 -keep class io.flutter.plugins.GeneratedPluginRegistrant { *; }
+
+# Cast creates the options provider named by manifest metadata.
+-keep class com.zarz.spotiflac.SpotiCastOptionsProvider { public <init>(); *; }

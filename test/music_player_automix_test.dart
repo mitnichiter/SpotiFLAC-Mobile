@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:spotiflac_android/services/cast/cast_service.dart';
 import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
@@ -16,6 +17,58 @@ import 'package:spotiflac_android/models/automix_options.dart';
 import 'package:spotiflac_android/services/automix_effect_renderer.dart';
 import 'package:spotiflac_android/services/automix_status.dart';
 import 'package:spotiflac_android/services/system_volume_service.dart';
+
+class _FakeCast extends CastService {
+  final stream = StreamController<Map<String, dynamic>>.broadcast(sync: true);
+  final calls = <String>[];
+  @override
+  bool get hasLoadedMedia => calls.any((call) => call.startsWith('load:'));
+  @override
+  Future<void> stop() async {
+    calls.add('stop');
+  }
+
+  @override
+  Stream<Map<String, dynamic>> get events => stream.stream;
+  @override
+  Future<void> load(
+    MediaItem item,
+    String source,
+    Duration position, {
+    bool autoplay = true,
+  }) async {
+    calls.add('load:${item.id}:$autoplay');
+  }
+
+  @override
+  Future<void> send(Map<String, dynamic> data) async {}
+  @override
+  Future<void> play() async {
+    calls.add('play');
+  }
+
+  @override
+  Future<void> pause() async {
+    calls.add('pause');
+  }
+
+  @override
+  Future<void> seek(Duration position) async {
+    calls.add('seek:${position.inMilliseconds}');
+  }
+
+  @override
+  Future<void> disconnect() async {
+    connected = false;
+    stream.add({'type': 'disconnected'});
+  }
+
+  @override
+  void dispose() {
+    unawaited(stream.close());
+    super.dispose();
+  }
+}
 
 class _EffectRenderer extends AutoMixEffectRenderer {
   final tails = <RenderedMixTail>[];
@@ -211,6 +264,48 @@ void main() {
       expect(await tail.directory.exists(), isFalse);
     }
   });
+
+  test(
+    'Cast takes audio off the phone, routes controls, and keeps queue state',
+    () async {
+      await handler.setQueueAndPlay(_tracks);
+      expect(native.playing, isNotEmpty);
+      final cast = _FakeCast()..connected = true;
+      await handler.useCast(cast);
+      expect(native.playing, isEmpty);
+      expect(cast.calls, ['load:one:true']);
+      await handler.pause();
+      await handler.play();
+      await handler.seek(const Duration(seconds: 8));
+      expect(cast.calls, containsAll(['pause', 'play', 'seek:8000']));
+      cast.stream.add({
+        'type': 'status',
+        'mediaId': 'one',
+        'positionMs': 12000,
+        'durationMs': 60000,
+        'playing': true,
+      });
+      expect(handler.playbackState.value.position.inSeconds, 12);
+      expect(handler.playbackState.value.playing, isTrue);
+      await handler.skipToNext();
+      expect(cast.calls.last, 'load:two:true');
+      cast.stream.add({
+        'type': 'status',
+        'mediaId': 'one',
+        'positionMs': 99000,
+        'playing': true,
+      });
+      expect(handler.playbackState.value.position.inSeconds, lessThan(99));
+      cast.stream.add({'type': 'finished', 'mediaId': 'two'});
+      await _until(() => cast.calls.contains('load:three:true'));
+      await cast.disconnect();
+      expect(handler.playbackState.value.playing, isFalse);
+      expect(native.playing, isEmpty);
+      expect(handler.mediaItem.value?.id, 'three');
+      await handler.dispose();
+      cast.dispose();
+    },
+  );
 
   test(
     'USB preference is opt-in and persists with existing DSP preferences',

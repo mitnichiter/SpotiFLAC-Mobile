@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:spotiflac_android/widgets/cast_button.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -102,11 +103,20 @@ class _AudioOutputButtonState extends State<AudioOutputButton> {
           ),
         );
       case TargetPlatform.android:
-        return IconButton(
-          tooltip: context.l10n.nowPlayingAudioOutput,
-          color: widget.color,
-          icon: const Icon(Icons.speaker_group_outlined),
-          onPressed: _showAndroidPicker,
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CastButton(
+              color: widget.color,
+              onPickerChanged: widget.onPickerChanged,
+            ),
+            IconButton(
+              tooltip: context.l10n.nowPlayingAudioOutput,
+              color: widget.color,
+              icon: const Icon(Icons.speaker_group_outlined),
+              onPressed: _showAndroidPicker,
+            ),
+          ],
         );
       default:
         return const SizedBox.shrink();

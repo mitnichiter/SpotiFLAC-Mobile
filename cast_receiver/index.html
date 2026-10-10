@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SpotiFLAC</title><link rel="stylesheet" href="receiver.css">
+</head>
+<body data-theme="mornye" data-page="player">
+  <div id="ambience" aria-hidden="true"><div id="ambience-fade"></div></div>
+  <header><span id="session-label">Now Playing</span><span id="greeting">Hello</span></header>
+  <main>
+    <section id="artwork-pane"><div id="cover-frame"><img id="cover" alt="Album artwork" hidden><span id="placeholder">♫</span></div></section>
+    <section id="content-pane">
+      <div class="track-header"><div class="titles"><h1 id="title">SpotiFLAC</h1><p id="artist">Choose a track on your phone</p><p id="album" hidden></p></div>
+        <button id="favorite" aria-label="Love track"><svg viewBox="0 0 24 24"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9z"/></svg></button>
+        <button id="more" aria-label="More options"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
+      </div>
+      <div id="player-pane">
+        <div class="timeline"><input id="seek" type="range" min="0" max="1" step="1" value="0" aria-label="Playback position"><div class="time-labels"><span id="elapsed">0:00</span><span id="quality"></span><span id="duration">−0:00</span></div></div>
+        <nav id="transport" aria-label="Playback controls">
+          <button id="shuffle" class="material-mode" aria-label="Shuffle"><svg viewBox="0 0 24 24"><path d="m4 5 4 4m-4 10 7-7 5-6h4m-3-3 3 3-3 3m-6 5 5 5h4m-3-3 3 3-3 3" fill="none" stroke="currentColor" stroke-width="2"/></svg></button>
+          <button id="previous" aria-label="Previous track"><svg viewBox="0 0 24 24"><path d="M12 5v14L2 12zm10 0v14l-10-7z"/></svg></button>
+          <button id="play" class="primary" aria-label="Play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
+          <button id="next" aria-label="Next track"><svg viewBox="0 0 24 24"><path d="M2 5v14l10-7zm10 0v14l10-7z"/></svg></button>
+          <button id="repeat" class="material-mode" aria-label="Repeat"><svg viewBox="0 0 24 24"><path d="M4 10V6h16l-3-3m3 3-3 3M20 14v4H4l3 3m-3-3 3-3" fill="none" stroke="currentColor" stroke-width="2"/></svg></button>
+        </nav>
+        <div class="volume-row"><svg viewBox="0 0 24 24"><path d="M3 9h4l5-4v14l-5-4H3z"/></svg><input id="volume" type="range" min="0" max="1" step="0.01" value="0.5" aria-label="TV volume"><svg viewBox="0 0 24 24"><path d="M3 9h4l5-4v14l-5-4H3zM15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14" stroke="currentColor" stroke-width="2"/></svg></div>
+      </div>
+      <section id="lyrics-pane" aria-label="Lyrics"><div id="lyrics" tabindex="0" aria-label="Scroll lyrics" aria-live="off"><p class="empty">No lyrics available</p></div></section>
+      <section id="queue-pane" tabindex="0" aria-label="Up next"><h2 id="queue-label">Up next</h2><div id="queue"></div></section>
+      <nav id="tabs" aria-label="Player views">
+        <button id="lyrics-toggle" aria-label="Lyrics" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M4 4h16v13h-7l-5 4v-4H4z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M7 7h4v5H7zm6 0h4v5h-4z"/></svg></button>
+        <button id="cast" aria-label="Stop casting"><svg viewBox="0 0 24 24"><path d="M3 5h18v14H12M3 19h.1M3 15a4 4 0 0 1 4 4M3 11a8 8 0 0 1 8 8" fill="none" stroke="currentColor" stroke-width="2"/></svg></button>
+        <button id="queue-toggle" aria-label="Up next" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13" stroke="currentColor" stroke-width="1.7"/><circle cx="3" cy="6" r="1.4"/><circle cx="3" cy="12" r="1.4"/><circle cx="3" cy="18" r="1.4"/></svg></button>
+      </nav>
+      <div id="options" hidden><button id="menu-shuffle">Shuffle</button><button id="menu-repeat">Repeat</button><button id="menu-stop">Stop casting</button></div>
+    </section>
+  </main>
+  <p id="status" role="status">Connect from SpotiFLAC Mobile</p>
+  <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+  <script src="receiver.js" type="module"></script>
+</body>
+</html>

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:spotiflac_android/providers/cast_provider.dart';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -28,10 +29,24 @@ final systemVolumeProvider = StreamProvider.autoDispose<double>(
   (ref) => SystemVolumeService.instance.changes,
 );
 
+final castVolumeProvider = StreamProvider.autoDispose<double?>((ref) async* {
+  final cast = ref.watch(castServiceProvider);
+  yield cast.connected ? cast.volume : null;
+  await for (final event in cast.events) {
+    if (event['type'] == 'status' ||
+        event['type'] == 'connected' ||
+        event['type'] == 'disconnected') {
+      yield cast.connected ? cast.volume : null;
+    }
+  }
+});
+
 final systemVolumeWriterProvider = Provider<Future<void> Function(double)>((
   ref,
 ) {
   return (value) {
+    final cast = ref.read(castServiceProvider);
+    if (cast.connected) return cast.setVolume(value);
     if (usbHardwareVolume.value != null) return setUsbHardwareVolume(value);
     final volume = VolumeController.instance;
     volume.showSystemUI = false;
@@ -90,7 +105,11 @@ class _MornyeVolumeControlState extends ConsumerState<MornyeVolumeControl> {
   @override
   Widget build(BuildContext context) {
     final usb = ref.watch(usbVolumeProvider).value ?? usbHardwareVolume.value;
-    final volume = usb == null
+    final castVolume = ref.watch(castVolumeProvider).value;
+    final casting = ref.read(castServiceProvider).connected;
+    final volume = casting
+        ? castVolume
+        : usb == null
         ? ref.watch(systemVolumeProvider).value
         : usb.available
         ? usb.fraction
@@ -98,7 +117,9 @@ class _MornyeVolumeControlState extends ConsumerState<MornyeVolumeControl> {
     final value = (_preview ?? volume ?? 0).clamp(0.0, 1.0);
     String percentage(double volume) => '${(volume * 100).round()}%';
     return Semantics(
-      label: usb == null
+      label: casting
+          ? context.l10n.castVolume
+          : usb == null
           ? context.l10n.nowPlayingVolume
           : context.l10n.usbHardwareVolume,
       slider: true,
