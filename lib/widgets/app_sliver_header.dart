@@ -47,6 +47,14 @@ class AppSliverHeader extends StatelessWidget {
     final topPadding = normalizedHeaderTopPadding(context);
     final maxHeight = tokens.headerExpandedHeight + topPadding;
     final edgeInset = detailHeaderEdgeInset(context);
+    final backControl =
+        leading ??
+        IconButton(
+          tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+          icon: Icon(context.isMornye ? Icons.chevron_left : Icons.arrow_back),
+          color: context.isMornye ? colorScheme.onSurface : null,
+          onPressed: () => Navigator.pop(context),
+        );
 
     return SliverAppBar(
       expandedHeight: maxHeight,
@@ -62,17 +70,14 @@ class AppSliverHeader extends StatelessWidget {
       leading: _showLeading
           ? Padding(
               padding: EdgeInsets.only(left: edgeInset),
-              child:
-                  leading ??
-                  IconButton(
-                    tooltip: MaterialLocalizations.of(
-                      context,
-                    ).backButtonTooltip,
-                    icon: Icon(
-                      context.isMornye ? Icons.chevron_left : Icons.arrow_back,
-                    ),
-                    onPressed: () => Navigator.pop(context),
-                  ),
+              child: context.isMornye
+                  ? Center(
+                      child: SizedBox.square(
+                        dimension: 48,
+                        child: MornyeGlassPanel(radius: 24, child: backControl),
+                      ),
+                    )
+                  : backControl,
             )
           : null,
       actionsPadding: EdgeInsets.only(right: edgeInset),
@@ -105,7 +110,7 @@ class AppSliverHeader extends StatelessWidget {
                       tokens.headerCollapsedTitleSize) *
                   expandRatio;
 
-          final titleBar = FlexibleSpaceBar(
+          return FlexibleSpaceBar(
             centerTitle: false,
             expandedTitleScale: 1.0,
             titlePadding: EdgeInsets.only(
@@ -113,36 +118,24 @@ class AppSliverHeader extends StatelessWidget {
               right: tokens.gapLg,
               bottom: tokens.gapLg,
             ),
-            title: Text(
-              title,
-              // The title grows as the header expands; without a cap a long
-              // localized title overflowed instead of ellipsizing.
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: fontSize,
-                fontWeight: FontWeight.bold,
-                letterSpacing: context.isMornye ? -0.7 * expandRatio : null,
-                color: colorScheme.onSurface,
-              ),
-            ),
-          );
-          if (!context.isMornye) return titleBar;
-          return Stack(
-            fit: StackFit.expand,
-            children: [
-              Positioned.fill(
-                child: Opacity(
-                  opacity: 1 - expandRatio,
-                  child: const MornyeGlassPanel(
-                    radius: 0,
-                    strongTint: true,
-                    child: SizedBox.expand(),
-                  ),
+            // Once scrolled, only the floating back button remains. This keeps
+            // the page title from overlapping rows through a transparent bar.
+            title: Opacity(
+              opacity: context.isMornye ? expandRatio : 1,
+              child: Text(
+                title,
+                // The title grows as the header expands; without a cap a long
+                // localized title overflowed instead of ellipsizing.
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: context.isMornye ? -0.7 * expandRatio : null,
+                  color: colorScheme.onSurface,
                 ),
               ),
-              titleBar,
-            ],
+            ),
           );
         },
       ),
