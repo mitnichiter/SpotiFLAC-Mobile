@@ -150,7 +150,8 @@ player.addEventListener(cast.framework.events.EventType.PLAYER_STATE_CHANGED,() 
 player.addEventListener(cast.framework.events.EventType.ERROR,() => status('Unable to play this track. Check the phone connection and audio format.'));
 document.addEventListener('keydown',event => {
   if (event.key === 'Escape' || event.key === 'Backspace') { $('options').hidden = true; page('player'); $('play').focus(); return; }
-  if (document.activeElement instanceof HTMLInputElement) return;
+  // Left/right adjust a range; up/down must let a TV remote leave it.
+  if (document.activeElement instanceof HTMLInputElement && !['ArrowUp','ArrowDown'].includes(event.key)) return;
   if (document.activeElement === $('lyrics')) {
     if (event.key === 'ArrowUp' || event.key === 'ArrowDown') { event.preventDefault(); $('lyrics').scrollBy({top:event.key === 'ArrowDown' ? 160 : -160,behavior:reducedMotion ? 'instant' : 'smooth'}); return; }
   }
