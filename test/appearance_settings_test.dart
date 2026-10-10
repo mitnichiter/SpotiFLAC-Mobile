@@ -89,6 +89,43 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('Mornye AMOLED background choice survives restart', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      kThemeStyleKey: 'mornye',
+      kThemeModeKey: 'dark',
+    });
+    final prefs = await SharedPreferences.getInstance();
+    await openSettings(tester, prefs);
+    final option = find.text('AMOLED Dark');
+    await tester.scrollUntilVisible(
+      option,
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(option);
+    await tester.pumpAndSettle();
+    expect(prefs.getBool(kUseAmoledKey), isTrue);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await openSettings(tester, prefs);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(AppearanceSettingsPage)),
+    );
+    expect(container.read(themeProvider).useAmoled, isTrue);
+    await tester.scrollUntilVisible(
+      option,
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(option);
+    await tester.pumpAndSettle();
+    expect(prefs.getBool(kUseAmoledKey), isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final mode in [ThemeMode.light, ThemeMode.dark]) {
     testWidgets('glass clarity previews live and survives restart ($mode)', (
       tester,

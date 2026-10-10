@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:spotiflac_android/providers/theme_provider.dart';
 import 'package:spotiflac_android/theme/cover_palette.dart';
 
 /// Opaque cover-derived surface, with full-bleed artwork on the player page
 /// and a muted two-tone gradient behind lyrics and the queue.
-class MornyePlayerBackground extends StatelessWidget {
+class MornyePlayerBackground extends ConsumerWidget {
   const MornyePlayerBackground({
     super.key,
     required this.artUri,
@@ -18,8 +20,11 @@ class MornyePlayerBackground extends StatelessWidget {
   final double? artworkAspectRatio;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final amoled =
+        theme.brightness == Brightness.dark &&
+        ref.watch(themeProvider.select((settings) => settings.useAmoled));
     final source = artUri?.scheme == 'file'
         ? artUri!.toFilePath()
         : artUri?.toString();
@@ -33,7 +38,7 @@ class MornyePlayerBackground extends StatelessWidget {
         ),
       ),
       child: CoverPaletteBuilder(
-        imageSource: source,
+        imageSource: amoled ? null : source,
         builder: (context, _) {
           final dominant = HSLColor.fromColor(
             source == null
@@ -64,7 +69,11 @@ class MornyePlayerBackground extends StatelessWidget {
                     ? Alignment.bottomRight
                     : Alignment.bottomCenter,
                 stops: artwork == null ? null : const [0, 0.5, 1],
-                colors: artwork == null
+                colors: amoled
+                    ? (artwork == null
+                          ? const [Colors.black, Colors.black]
+                          : const [Colors.black, Colors.black, Colors.black])
+                    : artwork == null
                     ? [
                         muted
                             .withLightness(0.28 + dominant.lightness * 0.24)

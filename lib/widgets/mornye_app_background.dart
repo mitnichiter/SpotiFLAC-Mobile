@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:spotiflac_android/providers/music_player_provider.dart';
+import 'package:spotiflac_android/providers/theme_provider.dart';
 import 'package:spotiflac_android/theme/cover_palette.dart';
 import 'package:spotiflac_android/theme/mornye_theme.dart';
 
@@ -15,6 +16,26 @@ class MornyeAppBackground extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     if (!context.isMornye) return child;
     final theme = Theme.of(context);
+    final amoled =
+        theme.brightness == Brightness.dark &&
+        ref.watch(themeProvider.select((settings) => settings.useAmoled));
+    Widget withCanvas(Widget canvas) => Stack(
+      fit: StackFit.expand,
+      children: [
+        RepaintBoundary(child: canvas),
+        Theme(
+          data: theme.copyWith(
+            scaffoldBackgroundColor: Colors.transparent,
+            appBarTheme: theme.appBarTheme.copyWith(
+              backgroundColor: Colors.transparent,
+            ),
+          ),
+          child: child,
+        ),
+      ],
+    );
+    // Pure black also skips artwork decoding/palette updates while enabled.
+    if (amoled) return withCanvas(const ColoredBox(color: Colors.black));
     final artUri = ref.watch(
       currentMediaItemProvider.select((item) => item.value?.artUri),
     );
@@ -23,27 +44,13 @@ class MornyeAppBackground extends ConsumerWidget {
         : artUri?.toString();
     return CoverPaletteBuilder(
       imageSource: source,
-      builder: (context, _) => Stack(
-        fit: StackFit.expand,
-        children: [
-          RepaintBoundary(
-            child: MornyeAmbientCanvas(
-              color: source == null
-                  ? const Color(0xff3676c8)
-                  : CoverPalette.sourceColor(source, theme.brightness) ??
-                        const Color(0xff3676c8),
-            ),
-          ),
-          Theme(
-            data: theme.copyWith(
-              scaffoldBackgroundColor: Colors.transparent,
-              appBarTheme: theme.appBarTheme.copyWith(
-                backgroundColor: Colors.transparent,
-              ),
-            ),
-            child: child,
-          ),
-        ],
+      builder: (context, _) => withCanvas(
+        MornyeAmbientCanvas(
+          color: source == null
+              ? const Color(0xff3676c8)
+              : CoverPalette.sourceColor(source, theme.brightness) ??
+                    const Color(0xff3676c8),
+        ),
       ),
     );
   }

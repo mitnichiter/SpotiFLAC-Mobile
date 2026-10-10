@@ -4,12 +4,62 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:spotiflac_android/providers/music_player_provider.dart';
+import 'package:spotiflac_android/providers/theme_provider.dart';
 import 'package:spotiflac_android/theme/mornye_theme.dart';
+import 'package:spotiflac_android/models/theme_settings.dart';
 import 'package:spotiflac_android/widgets/mornye_app_background.dart';
 import 'package:spotiflac_android/widgets/mornye_chrome.dart';
+import 'package:spotiflac_android/widgets/mornye_player_background.dart';
 
 void main() {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
+  testWidgets('AMOLED player keeps artwork above a pure black background', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({kUseAmoledKey: true});
+    tester.view.physicalSize = const Size(390, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final capture = GlobalKey();
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: MornyeTheme.build(Brightness.dark),
+          home: RepaintBoundary(
+            key: capture,
+            child: const MornyePlayerBackground(
+              artUri: null,
+              artwork: ColoredBox(color: Colors.blue),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.runAsync(() async {
+      final boundary =
+          capture.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+      final image = await boundary.toImage();
+      final pixels = (await image.toByteData(
+        format: ui.ImageByteFormat.rawRgba,
+      ))!;
+      final bottom = (700 * image.width + 40) * 4;
+      expect(
+        [
+          pixels.getUint8(bottom),
+          pixels.getUint8(bottom + 1),
+          pixels.getUint8(bottom + 2),
+        ],
+        [0, 0, 0],
+      );
+      final top = (40 * image.width + 40) * 4;
+      expect(pixels.getUint8(top + 2), greaterThan(pixels.getUint8(top)));
+      image.dispose();
+    });
+    expect(tester.takeException(), isNull);
+  });
   testWidgets('secondary labels stay readable on artwork-colored glass', (
     tester,
   ) async {
@@ -140,6 +190,33 @@ void main() {
       Navigator.of(tester.element(find.text('Details'))).pop();
       await tester.pumpAndSettle();
       expect(find.text('Open'), findsOneWidget);
+      await expectColoredBackground();
+      final container = ProviderScope.containerOf(
+        tester.element(find.text('Open')),
+      );
+      await container.read(themeProvider.notifier).setUseAmoled(true);
+      await tester.pumpAndSettle();
+      await tester.runAsync(() async {
+        final boundary =
+            capture.currentContext!.findRenderObject()!
+                as RenderRepaintBoundary;
+        final image = await boundary.toImage();
+        final pixels = (await image.toByteData(
+          format: ui.ImageByteFormat.rawRgba,
+        ))!;
+        final offset = (40 * image.width + 40) * 4;
+        expect(
+          [
+            pixels.getUint8(offset),
+            pixels.getUint8(offset + 1),
+            pixels.getUint8(offset + 2),
+          ],
+          [0, 0, 0],
+        );
+        image.dispose();
+      });
+      await container.read(themeProvider.notifier).setUseAmoled(false);
+      await tester.pumpAndSettle();
       await expectColoredBackground();
       expect(tester.takeException(), isNull);
     },

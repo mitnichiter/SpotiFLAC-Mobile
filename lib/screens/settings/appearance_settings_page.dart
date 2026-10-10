@@ -162,8 +162,7 @@ class AppearanceSettingsPage extends ConsumerWidget {
                     onChanged: (mode) =>
                         ref.read(themeProvider.notifier).setThemeMode(mode),
                   ),
-                  if (themeSettings.style == AppThemeStyle.material &&
-                      Theme.of(context).brightness == Brightness.dark)
+                  if (Theme.of(context).brightness == Brightness.dark)
                     SettingsSwitchItem(
                       icon: Icons.brightness_2,
                       title: context.l10n.appearanceAmoledDark,
